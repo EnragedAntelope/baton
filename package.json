@@ -1,0 +1,45 @@
+{
+  "name": "baton-relay",
+  "version": "0.1.0",
+  "description": "Pass-me-along AI coding: portable handoff state for relaying a project across people and coding agents. State travels, credentials never do.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "baton": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "skills"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "ai",
+    "coding-agents",
+    "handoff",
+    "collaboration",
+    "claude-code",
+    "opencode",
+    "codex"
+  ],
+  "dependencies": {
+    "commander": "^12.1.0",
+    "simple-git": "^3.27.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^4.1.8"
+  }
+}
