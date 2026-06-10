@@ -28,10 +28,10 @@ export function batonPaths(repoRoot: string) {
 
 export class BatonError extends Error {}
 
-async function readValidatedJson<T>(
+async function readValidatedJson<S extends z.ZodTypeAny>(
   filePath: string,
-  schema: z.ZodType<T>,
-): Promise<T> {
+  schema: S,
+): Promise<z.output<S>> {
   let raw: string;
   try {
     raw = await fs.readFile(filePath, 'utf8');
@@ -61,10 +61,10 @@ async function readValidatedJson<T>(
   return result.data;
 }
 
-async function writeValidatedJson<T>(
+async function writeValidatedJson<S extends z.ZodTypeAny>(
   filePath: string,
-  schema: z.ZodType<T>,
-  value: T,
+  schema: S,
+  value: z.output<S>,
 ): Promise<void> {
   const validated = schema.parse(value); // refuse to write invalid state
   await fs.writeFile(filePath, JSON.stringify(validated, null, 2) + '\n', 'utf8');
