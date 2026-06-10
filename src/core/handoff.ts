@@ -101,7 +101,9 @@ export async function archiveHandoff(
     return null; // nothing to archive (first pass)
   }
   const stamp = now.toISOString().replace(/:/g, '-').replace(/\.\d+Z$/, 'Z');
-  const file = path.join(paths.sessions, `${stamp}.${user}.md`);
+  // Handles come from git user.name and may contain path-hostile characters.
+  const safeUser = user.replace(/[^A-Za-z0-9._-]+/g, '_');
+  const file = path.join(paths.sessions, `${stamp}.${safeUser}.md`);
   await fs.mkdir(paths.sessions, { recursive: true });
   await fs.writeFile(file, content, 'utf8');
   return file;

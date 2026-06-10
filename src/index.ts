@@ -70,8 +70,18 @@ program
   .description('Hand off: validate HANDOFF.md, run policy gates, tag, release, push')
   .option('--agent <agent>', 'agent that produced this session (for the record)')
   .option('--skip-tests', 'skip the test gate — recorded in the pass tag')
+  .option(
+    '--auto',
+    'experimental: invoke your agent CLI headlessly to fill the handoff template',
+  )
   .action((opts) =>
-    run(() => passCommand(process.cwd(), { agent: opts.agent, skipTests: opts.skipTests })),
+    run(() =>
+      passCommand(process.cwd(), {
+        agent: opts.agent,
+        skipTests: opts.skipTests,
+        auto: opts.auto,
+      }),
+    ),
   );
 
 program

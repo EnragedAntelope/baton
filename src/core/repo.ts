@@ -90,9 +90,13 @@ export async function pushFast(git: SimpleGit): Promise<PushResult> {
   }
 }
 
-/** Undo the most recent local commit (used to back out a lost claim race). */
+/**
+ * Undo the most recent local commit (used to back out a lost claim race).
+ * --keep, not --hard: claim doesn't require a clean tree, so the user may
+ * have uncommitted work that must survive the rollback.
+ */
 export async function rollbackLastCommit(git: SimpleGit): Promise<void> {
-  await git.reset(['--hard', 'HEAD~1']);
+  await git.reset(['--keep', 'HEAD~1']);
 }
 
 export async function commitPaths(

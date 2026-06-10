@@ -117,6 +117,24 @@ describe('full relay between two machines', () => {
     expect((await bob.git.status()).isClean()).toBe(true);
   });
 
+  it('losing a claim race preserves uncommitted local work', async () => {
+    const wip = path.join(bob.root, 'wip.txt');
+    await fs.writeFile(wip, 'precious uncommitted work', 'utf8');
+
+    await expect(
+      claimCommand(bob.root, {
+        afterSync: async () => {
+          await claimCommand(alice.root);
+        },
+      }),
+    ).rejects.toThrow(/while you were claiming/);
+
+    // The rollback must not have nuked bob's dirty file
+    expect(await fs.readFile(wip, 'utf8')).toBe('precious uncommitted work');
+    const state = await readState(bob.root);
+    expect(state.holder).toBe('Alice Dev');
+  });
+
   it('pass refuses a dirty working tree', async () => {
     await claimCommand(alice.root);
     await fs.writeFile(path.join(alice.root, 'wip.txt'), 'uncommitted', 'utf8');

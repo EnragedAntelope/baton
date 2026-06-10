@@ -91,16 +91,20 @@ npm run build && node dist/index.js --help
    on pickup (`--force` override is loud)
 7. ✅ CI: GitHub Actions matrix (ubuntu/windows/macos × Node 20/22)
 8. ✅ Bonus: `task list/add/set`, `scan` commands
+9. ✅ Phase 1 spike: `baton pass --auto` invokes the agent CLI headlessly
+   (`claude -p` / `opencode run` / `codex exec`, prompt via stdin only — no
+   shell-quoted user data) to fill the template; refuses inside an agent
+   session (env detection); always degrades to the manual template flow.
+   Caveat: a headless agent reconstructs the session cold from git history,
+   so in-session distillation (the skill) remains the recommended path.
 
 ### Remaining
 
-- **Phase 1 spike (flagged in plan):** non-interactive agent invocation from
-  `baton pass` (`claude -p`, `opencode run`) so the CLI can trigger the
-  baton-pass skill itself instead of instructing the user. Currently the
-  two-phase template flow covers this manually.
 - **Phase 2:** coordination server — atomic claim API (Postgres/Redis lock),
   GitHub OAuth, queue + Discord webhook notifications, read-only dashboard.
 - **Phase 3:** allowance-aware checkpoint nudges, Gemini adapter,
   `baton doctor`, `baton compact` (squash session archives).
-- Publish to npm (`baton-relay`); set up a GitHub repo + branch protection.
+- Publish to npm (`baton-relay`); enable branch protection on the GitHub repo.
+- Real-world validation of `--auto` against real agent CLI versions (unit
+  tests use an injected invoker; the spawn path is exercised only manually).
 - Real-world dogfood: relay this repo's own development via Baton.

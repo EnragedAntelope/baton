@@ -103,6 +103,13 @@ On pickup, the adapter for your agent injects a pointer block into its native
 context file (`CLAUDE.md` for Claude Code, `AGENTS.md` for OpenCode/Codex) so
 every future session in that clone starts baton-aware.
 
+Not in an agent session? `baton pass --auto` (experimental) invokes your agent
+CLI headlessly (`claude -p`, `opencode run`, `codex exec`) to fill the handoff
+template from the repo's recent history, then continues the pass. It refuses to
+run from *inside* an agent session — the agent that did the work writes a
+better handoff than a cold one — and falls back to the manual template if the
+CLI isn't available.
+
 ## Security model (the short version)
 
 - **No credential ever travels.** Baton never reads, stores, or proxies LLM

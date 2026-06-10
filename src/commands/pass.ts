@@ -17,12 +17,27 @@ import {
 } from '../core/repo.js';
 import { formatFindings, scanFiles } from '../security/secrets-scan.js';
 import { getGit } from '../core/repo.js';
+import {
+  buildAgentCommand,
+  buildFillPrompt,
+  detectAgentSession,
+  invokeAgent,
+} from '../core/agent-invoke.js';
+import { AgentNameSchema } from '../types.js';
 import { loadContext, BatonContext } from './context.js';
 
 export interface PassOptions {
   agent?: string;
   /** Skip the test gate (recorded in the output, not silent). */
   skipTests?: boolean;
+  /** Experimental: invoke the agent CLI headlessly to fill the template. */
+  auto?: boolean;
+}
+
+/** Test seam for the headless-agent path. */
+export interface PassDeps {
+  invoke?: typeof invokeAgent;
+  detectSession?: typeof detectAgentSession;
 }
 
 /** Parse the ISO timestamp out of the "# Handoff — {iso} — from …" header. */
@@ -33,7 +48,10 @@ function handoffTimestamp(content: string): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-async function prepareTemplate(ctx: BatonContext, agent: string): Promise<never> {
+async function writeFreshTemplate(
+  ctx: BatonContext,
+  agent: string,
+): Promise<string | null> {
   const paths = batonPaths(ctx.root);
   const archived = await archiveHandoff(ctx.root, ctx.handle);
   const template = handoffTemplate({
@@ -44,30 +62,35 @@ async function prepareTemplate(ctx: BatonContext, agent: string): Promise<never>
     tasks: ctx.tasks,
   });
   await fs.writeFile(paths.handoff, template, 'utf8');
-  throw new BatonError(
-    [
-      'HANDOFF.md is not ready — a fresh template has been written to .baton/HANDOFF.md.',
-      archived ? `(previous handoff archived to ${archived})` : '',
-      '',
-      'Fill it in, then re-run "baton pass". Two ways:',
-      '  - With an agent: ask it to run the baton-pass skill (skills/baton-pass/SKILL.md)',
-      '  - By hand: replace every "_(fill me in)_" placeholder',
-    ]
-      .filter(Boolean)
-      .join('\n'),
-  );
+  return archived;
+}
+
+function templateInstructions(archived: string | null): string {
+  return [
+    'HANDOFF.md is not ready — a fresh template has been written to .baton/HANDOFF.md.',
+    archived ? `(previous handoff archived to ${archived})` : '',
+    '',
+    'Fill it in, then re-run "baton pass". Three ways:',
+    '  - From inside your agent session: ask it to pass the baton (baton-pass skill)',
+    '  - Headless (experimental): baton pass --auto invokes your agent CLI for you',
+    '  - By hand: replace every "_(fill me in)_" placeholder',
+  ]
+    .filter(Boolean)
+    .join('\n');
 }
 
 export async function passCommand(
   cwd: string,
   opts: PassOptions = {},
+  deps: PassDeps = {},
 ): Promise<string> {
   const ctx = await loadContext(cwd);
   const paths = batonPaths(ctx.root);
-  const agent =
+  const agent = AgentNameSchema.parse(
     opts.agent ??
-    ctx.config.participants.find((p) => p.handle === ctx.handle)?.agent ??
-    ctx.config.defaultAgent;
+      ctx.config.participants.find((p) => p.handle === ctx.handle)?.agent ??
+      ctx.config.defaultAgent,
+  );
 
   if (ctx.state.holder !== ctx.handle) {
     throw new BatonError(
@@ -84,14 +107,60 @@ export async function passCommand(
     );
   }
 
+  const notes: string[] = [];
+
   // Gate 2: the handoff must be fresh (newer than the last pass) and complete.
-  const content = await fs.readFile(paths.handoff, 'utf8');
-  const ts = handoffTimestamp(content);
-  const stale =
-    ts === null ||
-    (ctx.state.lastPass !== null && ts.getTime() <= new Date(ctx.state.lastPass.at).getTime());
-  if (stale) {
-    await prepareTemplate(ctx, agent); // throws with instructions
+  const isStale = (text: string): boolean => {
+    const ts = handoffTimestamp(text);
+    return (
+      ts === null ||
+      (ctx.state.lastPass !== null &&
+        ts.getTime() <= new Date(ctx.state.lastPass.at).getTime())
+    );
+  };
+  let content = await fs.readFile(paths.handoff, 'utf8');
+  if (isStale(content)) {
+    const archived = await writeFreshTemplate(ctx, agent);
+    if (!opts.auto) {
+      throw new BatonError(templateInstructions(archived));
+    }
+
+    // --auto: have the holder's agent CLI fill the template headlessly.
+    const session = (deps.detectSession ?? detectAgentSession)();
+    if (session) {
+      throw new BatonError(
+        `--auto refused: this looks like the inside of a ${session} session. The agent doing the work should fill .baton/HANDOFF.md itself (baton-pass skill) — spawning a second, cold agent would produce a worse handoff.`,
+      );
+    }
+    const spec = buildAgentCommand(agent);
+    if (!spec) {
+      throw new BatonError(
+        `--auto: no headless command known for agent "${agent}". ${templateInstructions(archived)}`,
+      );
+    }
+    const result = await (deps.invoke ?? invokeAgent)(
+      spec,
+      buildFillPrompt(),
+      ctx.root,
+    );
+    if (!result.ok) {
+      throw new BatonError(
+        `--auto: agent invocation failed — ${result.detail}\n\n${templateInstructions(archived)}`,
+      );
+    }
+    content = await fs.readFile(paths.handoff, 'utf8');
+    if (isStale(content)) {
+      throw new BatonError(
+        '--auto: the agent rewrote the handoff header instead of keeping it. Fix .baton/HANDOFF.md by hand and re-run "baton pass".',
+      );
+    }
+    // Re-check gate 1: the agent was told to touch only .baton/, but verify.
+    if (!(await isCleanOutsideBaton(ctx.git))) {
+      throw new BatonError(
+        '--auto: the agent modified files outside .baton/. Review those changes (commit or revert), then re-run "baton pass".',
+      );
+    }
+    notes.push(`Handoff filled headlessly by ${agent} (--auto)`);
   }
   const validation = validateHandoff(content);
   if (!validation.ok) {
@@ -102,7 +171,6 @@ export async function passCommand(
   }
 
   // Gate 3: tests must pass (policy), using the command from config.json.
-  const notes: string[] = [];
   if (ctx.state.policy.requireCleanTests && !opts.skipTests) {
     const testCmd = ctx.config.commands.test;
     if (testCmd) {
