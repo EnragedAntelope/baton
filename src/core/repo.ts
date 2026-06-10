@@ -55,7 +55,9 @@ export async function syncFromOrigin(git: SimpleGit): Promise<void> {
   if (!(await hasOrigin(git))) return;
   const branch = await currentBranch(git);
   try {
-    await git.pull('origin', branch, { '--ff-only': null });
+    // --tags: pulling an explicit refspec disables git's tag auto-following,
+    // and the baton/pass/* custody chain must travel with the state.
+    await git.pull('origin', branch, { '--ff-only': null, '--tags': null });
   } catch (err) {
     throw new BatonError(
       `Could not fast-forward from origin/${branch}. Resolve your local divergence first.\n${(err as Error).message}`,
