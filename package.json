@@ -3,6 +3,14 @@
   "version": "0.1.0",
   "description": "Pass-me-along AI coding: portable handoff state for relaying a project across people and coding agents. State travels, credentials never do.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/EnragedAntelope/baton.git"
+  },
+  "homepage": "https://github.com/EnragedAntelope/baton#readme",
+  "bugs": {
+    "url": "https://github.com/EnragedAntelope/baton/issues"
+  },
   "type": "module",
   "engines": {
     "node": ">=20"

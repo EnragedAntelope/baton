@@ -70,10 +70,15 @@ tests/                vitest; helpers.ts builds real temp git repos and a
 ## Verification
 
 ```bash
-npm test            # 40 tests incl. two-machine relay, claim race, gates
+npm test            # 48 tests incl. two-machine relay, claim race, gates
 npm run typecheck
 npm run build && node dist/index.js --help
 ```
+
+Repo: https://github.com/EnragedAntelope/baton (CI matrix must stay green).
+Note: GitHub push protection scans every pushed blob — fake keys in tests are
+assembled by string concatenation so no realistic secret literal exists in any
+commit. Keep it that way.
 
 ## Status
 

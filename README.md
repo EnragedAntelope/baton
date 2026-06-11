@@ -1,5 +1,7 @@
 # 🪃 Baton
 
+[![CI](https://github.com/EnragedAntelope/baton/actions/workflows/ci.yml/badge.svg)](https://github.com/EnragedAntelope/baton/actions/workflows/ci.yml)
+
 **Pass-me-along AI coding.** Relay one project across several people's AI coding
 subscriptions — Claude Code today, OpenCode tonight, Codex tomorrow morning —
 without losing the plot between sessions.
