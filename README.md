@@ -42,31 +42,46 @@ alice (Claude Code)          bob (OpenCode)            carol (Codex)
 - **Git is the only infrastructure.** No server, no accounts, no new access
   control — if you can push to the repo, you can relay.
 
-## Quick start
+## Quick Start (Zero Install)
+
+No install needed — just Node.js ≥ 20:
 
 ```bash
-npm install -g baton-relay        # or: npx baton-relay
-
 cd your-project                   # any git repo
-baton init --test-cmd "npm test"  # scaffolds .baton/, installs secret-scan hook
+npx baton-relay init --auto       # auto-detects your test command, agent, and settings
+npx baton-relay doctor            # verify everything is healthy
 git push
 
-baton claim                       # take the baton, start working
+npx baton-relay claim             # take the baton, start working
 # ... code with your agent ...
-baton pass                        # wrap up: fills gates, tags, releases
+npx baton-relay pass              # wrap up: fills gates, tags, releases
 ```
 
 Next person, on their machine:
 
 ```bash
 git pull
-baton pickup --agent claude-code  # or opencode | codex | generic
+npx baton-relay pickup            # auto-detects agent, pulls, verifies custody, bootstraps
 # paste the printed first-prompt into your agent — you're caught up
 ```
+
+> **Tip:** `npx` caches baton-relay after the first run, so subsequent commands are instant.
+> First-run download is ~4 MB.
 
 Add teammates to `.baton/config.json` (handle + git emails) so passes are
 attributable.
 
+### Installation (Optional)
+
+Prefer a global install? `baton` works the same way:
+
+```bash
+npm install -g baton-relay
+baton init --auto
+baton doctor
+baton claim
+baton pass
+```
 ## What's in `.baton/`
 
 | File | What it is |
@@ -83,11 +98,13 @@ attributable.
 
 | Command | What it does |
 |---|---|
-| `baton init` | Scaffold `.baton/`, seed `.gitignore`, install the secret-scan hook |
+| `baton init [--auto]` | Scaffold `.baton/`, auto-detect settings, install secret-scan hook |
+| `baton doctor` | Diagnose environment and `.baton/` health (Node.js, git, state, agents) |
 | `baton status` | Who holds it, branch state, open tasks |
 | `baton claim` | Take the baton (refuses if someone holds a fresh lock) |
-| `baton pass` | Validate handoff → run gates → tag → release → push |
-| `baton pickup` | Pull → verify custody → claim → bootstrap your agent → digest |
+| `baton pass [--interactive] [--auto]` | Validate handoff → run gates → tag → release → push |
+| `baton pickup [--no-pull]` | Pull → verify custody → claim → bootstrap your agent → digest |
+| `baton undo --claim \| --pass \| --state` | Roll back a claim, abort a pass, or restore state from snapshot |
 | `baton steal` | Take a **stale** baton (12h+ default) — loudly audited |
 | `baton log` | The pass history (chain of custody) |
 | `baton task list/add/set` | Manage the task ledger by hand |
@@ -105,12 +122,17 @@ On pickup, the adapter for your agent injects a pointer block into its native
 context file (`CLAUDE.md` for Claude Code, `AGENTS.md` for OpenCode/Codex) so
 every future session in that clone starts baton-aware.
 
-Not in an agent session? `baton pass --auto` (experimental) invokes your agent
-CLI headlessly (`claude -p`, `opencode run`, `codex exec`) to fill the handoff
-template from the repo's recent history, then continues the pass. It refuses to
-run from *inside* an agent session — the agent that did the work writes a
-better handoff than a cold one — and falls back to the manual template if the
-CLI isn't available.
+Not in an agent session? `baton pass --auto` invokes your agent CLI headlessly
+(`claude -p`, `opencode run`, `codex exec`) to fill the handoff template from the
+repo's recent history, then continues the pass. It refuses to run from *inside*
+an agent session — the agent that did the work writes a better handoff than a
+cold one — and falls back to the manual template if the CLI isn't available.
+Prefer an interactive handoff? `baton pass --interactive` prompts you for each
+section with smart defaults from the previous session.
+
+Made a mistake? `baton undo --claim` releases the baton and restores pre-claim
+state. `baton undo --pass` cleans up a mid-pipeline pass. `baton undo --state`
+lets you interactively pick a snapshot to roll back to.
 
 ## Security model (the short version)
 

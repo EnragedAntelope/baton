@@ -34,6 +34,7 @@ export async function doctorCommand(cwd: string): Promise<string> {
   } catch {
     checks.push({ name: 'Git repo', status: 'FAIL', detail: 'Not inside a git repository' });
     hasFail = true;
+    process.exitCode = 1;
     return formatChecks(checks, hasFail);
   }
 
@@ -62,6 +63,7 @@ export async function doctorCommand(cwd: string): Promise<string> {
   } catch {
     checks.push({ name: '.baton/ directory', status: 'FAIL', detail: 'Not initialized — run "baton init"' });
     hasFail = true;
+    process.exitCode = 1;
     return formatChecks(checks, hasFail);
   }
 
