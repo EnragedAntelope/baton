@@ -13,7 +13,9 @@ import {
   findRepoRoot,
   getGit,
   getIdentity,
+  hasOrigin,
 } from '../core/repo.js';
+import { confirmPrompt } from '../core/prompts.js';
 import { installHook } from '../security/hook.js';
 import {
   AgentNameSchema,
@@ -21,6 +23,7 @@ import {
   defaultState,
   defaultTasksFile,
 } from '../types.js';
+import { detectAgent } from '../adapters/index.js';
 
 export interface InitOptions {
   project?: string;
@@ -29,6 +32,7 @@ export interface InitOptions {
   testCmd?: string;
   commit?: boolean; // commander --no-commit
   refreshHook?: boolean;
+  auto?: boolean; // --auto: accept all detected defaults without prompting
 }
 
 const GITIGNORE_BLOCK = `
@@ -38,6 +42,7 @@ const GITIGNORE_BLOCK = `
 !.env.example
 *.pem
 *.key
+.baton/.snapshots/
 `;
 
 function projectMd(project: string, testCmd?: string): string {
@@ -62,6 +67,36 @@ _(style rules, patterns, things agents must respect)_
 Each member keeps their own .env (gitignored). Reference secrets by NAME only —
 never paste values into any .baton/ file.
 `;
+}
+
+/** Scan the project root for known test commands. */
+export async function autoDetectTestCmd(root: string): Promise<string | null> {
+  // npm / package.json
+  try {
+    const raw = await fs.readFile(path.join(root, 'package.json'), 'utf8');
+    const pkg = JSON.parse(raw);
+    if (pkg.scripts?.test) return 'npm test';
+  } catch { /* no package.json */ }
+
+  // Cargo
+  try {
+    await fs.access(path.join(root, 'Cargo.toml'));
+    return 'cargo test';
+  } catch { /* no Cargo.toml */ }
+
+  // Go
+  try {
+    await fs.access(path.join(root, 'go.mod'));
+    return 'go test ./...';
+  } catch { /* no go.mod */ }
+
+  // Makefile
+  try {
+    const raw = await fs.readFile(path.join(root, 'Makefile'), 'utf8');
+    if (/^test:/m.test(raw)) return 'make test';
+  } catch { /* no Makefile or no test: target */ }
+
+  return null;
 }
 
 const DECISIONS_MD = `# Decision log
@@ -104,7 +139,53 @@ export async function initCommand(
 
   const project = opts.project ?? path.basename(root);
   const handle = opts.handle ?? identity.name;
-  const agent = opts.agent ? AgentNameSchema.parse(opts.agent) : undefined;
+
+  // --- Auto-detect agent ---
+  let agent = opts.agent ? AgentNameSchema.parse(opts.agent) : undefined;
+  if (!agent && opts.auto) {
+    agent = (await detectAgent(root)) ?? undefined;
+  } else if (!agent && process.stdin.isTTY) {
+    const detected = await detectAgent(root);
+    if (detected) {
+      const ok = await confirmPrompt(`Detected agent: ${detected}. Use this?`);
+      if (ok) agent = detected;
+    }
+  }
+
+  // --- Auto-detect test command ---
+  let testCmd = opts.testCmd;
+  if (!testCmd) {
+    if (opts.auto) {
+      testCmd = (await autoDetectTestCmd(root)) ?? undefined;
+      if (!testCmd) {
+        throw new BatonError(
+          'Could not auto-detect a test command. Run "baton init --test-cmd <cmd>" to specify one explicitly.',
+        );
+      }
+    } else if (process.stdin.isTTY) {
+      const detected = await autoDetectTestCmd(root);
+      if (detected) {
+        const ok = await confirmPrompt(`Detected test command: ${detected}. Use this?`);
+        if (ok) testCmd = detected;
+      }
+      if (!testCmd) {
+        throw new BatonError(
+          'No test command detected. Run "baton init --test-cmd <cmd>" to specify one.',
+        );
+      }
+    } else {
+      // Non-TTY, non-auto: leave testCmd undefined (backward compat with tests)
+      testCmd = undefined;
+    }
+  }
+
+  // --- Git remote check (informational) ---
+  if (!opts.auto && process.stdin.isTTY && !(await hasOrigin(git))) {
+    await confirmPrompt(
+      'No git remote "origin" found. Continue anyway? (needed for relay)',
+      true,
+    );
+  }
 
   await fs.mkdir(paths.sessions, { recursive: true });
 
@@ -115,12 +196,12 @@ export async function initCommand(
     ...(agent ? { agent } : {}),
   });
   if (agent) config.defaultAgent = agent;
-  if (opts.testCmd) config.commands.test = opts.testCmd;
+  if (testCmd) config.commands.test = testCmd;
 
   await writeState(root, defaultState());
   await writeTasks(root, defaultTasksFile());
   await writeConfig(root, config);
-  await fs.writeFile(paths.project, projectMd(project, opts.testCmd), 'utf8');
+  await fs.writeFile(paths.project, projectMd(project, testCmd), 'utf8');
   await fs.writeFile(paths.decisions, DECISIONS_MD, 'utf8');
   await fs.writeFile(paths.handoff, HANDOFF_STUB, 'utf8');
 
@@ -142,6 +223,18 @@ export async function initCommand(
     `Initialized .baton/ for project "${project}" (participant: ${handle} <${identity.email}>)`,
     `Secret-scan hook: ${path.relative(root, hook.scriptPath)}`,
   ];
+  if (agent && !opts.agent) {
+    lines.push(`Auto-detected agent: ${agent}`);
+  }
+  if (testCmd && !opts.testCmd) {
+    lines.push(`Auto-detected test command: ${testCmd}`);
+  }
+  const hasRemote = await hasOrigin(git);
+  if (!hasRemote) {
+    lines.push(
+      'Note: no git remote "origin" found. Push to set one up before the first relay pass.',
+    );
+  }
   if (!hook.shimInstalled) {
     lines.push(
       'WARNING: an existing .git/hooks/pre-commit was left untouched — chain it to',

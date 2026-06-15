@@ -31,3 +31,6 @@ Thumbs.db
 
 # Test artifacts
 coverage/
+
+# Snapshot state — local-only, never committed
+.baton/.snapshots/

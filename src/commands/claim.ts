@@ -1,4 +1,4 @@
-import { readState, writeState } from '../core/files.js';
+import { readState, writeState, saveSnapshot } from '../core/files.js';
 import { claimState, describeHolder } from '../core/lock.js';
 import {
   commitPaths,
@@ -24,6 +24,8 @@ export async function claimCommand(
 
   // Re-read after the pull — state.json may have just changed.
   const state = await readState(ctx.root);
+  // Save snapshot before claiming so undo can restore pre-claim state.
+  await saveSnapshot(ctx.root);
   const claimed = claimState(state, ctx.handle);
   if (state.holder === ctx.handle) {
     return `You already hold the baton (${describeHolder(state)}).`;

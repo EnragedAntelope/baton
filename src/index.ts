@@ -10,11 +10,9 @@ import { passCommand } from './commands/pass.js';
 import { pickupCommand } from './commands/pickup.js';
 import { stealCommand } from './commands/steal.js';
 import { logCommand } from './commands/log.js';
-import {
-  taskAddCommand,
-  taskListCommand,
-  taskSetCommand,
-} from './commands/task.js';
+import { doctorCommand } from './commands/doctor.js';
+import { undoCommand, UndoMode } from './commands/undo.js';
+import { taskAddCommand, taskListCommand, taskSetCommand } from './commands/task.js';
 
 const program = new Command();
 
@@ -53,6 +51,7 @@ program
   .option('--test-cmd <cmd>', 'test command used by the pass policy gate')
   .option('--no-commit', 'do not create the init commit')
   .option('--refresh-hook', 'regenerate the secret-scan hook only')
+  .option('--auto', 'auto-detect project settings without prompting')
   .action((opts) => run(() => initCommand(process.cwd(), opts)));
 
 program
@@ -72,7 +71,12 @@ program
   .option('--skip-tests', 'skip the test gate — recorded in the pass tag')
   .option(
     '--auto',
-    'experimental: invoke your agent CLI headlessly to fill the handoff template',
+    'invoke your agent CLI headlessly to fill the handoff template',
+  )
+  .option(
+    '--auto-timeout <seconds>',
+    'timeout for --auto agent invocation (default 60)',
+    '60',
   )
   .action((opts) =>
     run(() =>
@@ -80,6 +84,7 @@ program
         agent: opts.agent,
         skipTests: opts.skipTests,
         auto: opts.auto,
+        autoTimeout: Number(opts.autoTimeout),
       }),
     ),
   );
@@ -89,8 +94,9 @@ program
   .description('Pull, claim, verify custody, bootstrap your agent, show the digest')
   .option('--agent <agent>', 'your agent: claude-code | opencode | codex | generic')
   .option('--force', 'proceed despite custody verification errors')
+  .option('--no-pull', 'skip the automatic git pull before pickup')
   .action((opts) =>
-    run(() => pickupCommand(process.cwd(), { agent: opts.agent, force: opts.force })),
+    run(() => pickupCommand(process.cwd(), { agent: opts.agent, force: opts.force, noPull: !opts.pull })),
   );
 
 program
@@ -99,10 +105,32 @@ program
   .action(() => run(() => stealCommand(process.cwd())));
 
 program
+  .command('undo')
+  .description('Undo a claim or pass — release the baton and restore state from a snapshot')
+  .option('--claim', 'Undo a claim: release the lock and restore pre-claim state')
+  .option('--pass', 'Undo a pass mid-pipeline: clean up partial HANDOFF.md and restore state')
+  .option('--state', 'Interactively select a snapshot to restore')
+  .action((opts) => {
+    const modes: UndoMode[] = [];
+    if (opts.claim) modes.push('claim');
+    if (opts.pass) modes.push('pass');
+    if (opts.state) modes.push('state');
+    if (modes.length !== 1) {
+      console.error('baton: specify exactly one of --claim, --pass, or --state');
+      process.exitCode = 1;
+      return;
+    }
+    return run(() => undoCommand(process.cwd(), { mode: modes[0]! }));
+  });
+program
   .command('log')
   .description('Show the pass history (chain of custody tags)')
   .action(() => run(() => logCommand(process.cwd())));
 
+program
+  .command('doctor')
+  .description('Diagnose environment and .baton/ health')
+  .action(() => run(() => doctorCommand(process.cwd())));
 program
   .command('scan')
   .description('Scan .baton/ files for secrets (used by the pre-commit hook)')

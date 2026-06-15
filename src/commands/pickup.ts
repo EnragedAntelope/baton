@@ -7,6 +7,7 @@ import {
   findRepoRoot,
   getGit,
   headCommit,
+  isCleanOutsideBaton,
   pushFast,
   rollbackLastCommit,
   syncFromOrigin,
@@ -22,6 +23,8 @@ export interface PickupOptions {
   agent?: string;
   /** Proceed even when custody verification fails (loudly recorded). */
   force?: boolean;
+  /** Skip the automatic git pull before pickup. */
+  noPull?: boolean;
 }
 
 /** Extract one section's body from HANDOFF.md. */
@@ -38,7 +41,29 @@ export async function pickupCommand(
 ): Promise<string> {
   // Sync first so we claim against the latest relay state — a fresh clone
   // may not even have .baton/ until this pull lands.
-  await syncFromOrigin(getGit(await findRepoRoot(cwd)));
+  if (!opts.noPull) {
+    const root = await findRepoRoot(cwd);
+    const git = getGit(root);
+    if (await isCleanOutsideBaton(git)) {
+      try {
+        await syncFromOrigin(git);
+      } catch (err) {
+        const msg = (err as Error).message ?? String(err);
+        if (/could not resolve host|network|enotfound|EAI_AGAIN/i.test(msg)) {
+          throw new BatonError('Could not pull from origin — check your network connection.');
+        }
+        if (/conflict|merge/i.test(msg)) {
+          throw new BatonError('Pull failed due to merge conflict. Resolve manually and re-run.');
+        }
+        throw new BatonError(`Auto-pull failed: ${msg}`);
+      }
+    } else {
+      // Dirty tree — don't risk stashing or aborting user work; just warn.
+      process.stderr.write(
+        'Working tree has uncommitted changes — skipping auto-pull.\n',
+      );
+    }
+  }
   const ctx = await loadContext(cwd);
   const agentName = AgentNameSchema.parse(
     opts.agent ??
@@ -67,6 +92,32 @@ export async function pickupCommand(
       '.baton/state.json',
     ]);
     const push = await pushFast(ctx.git);
+    if (push.rejected) {
+      await rollbackLastCommit(ctx.git);
+      await syncFromOrigin(ctx.git);
+      const current = await readState(ctx.root);
+      // If the baton is free after sync, retry the claim once.
+      if (current.holder === null) {
+        const claimed = claimState(current, ctx.handle);
+        await writeState(ctx.root, claimed);
+        await commitPaths(ctx.git, `baton: pickup by ${ctx.handle}`, [
+          '.baton/state.json',
+        ]);
+        const retry = await pushFast(ctx.git);
+        if (retry.rejected) {
+          await rollbackLastCommit(ctx.git);
+          await syncFromOrigin(ctx.git);
+          const final = await readState(ctx.root);
+          throw new BatonError(
+            `Someone claimed the baton while you were picking up — ${describeHolder(final)}.`,
+          );
+        }
+      } else {
+        throw new BatonError(
+          `Someone claimed the baton while you were picking up — ${describeHolder(current)}.`,
+        );
+      }
+    }
     if (push.rejected) {
       await rollbackLastCommit(ctx.git);
       await syncFromOrigin(ctx.git);

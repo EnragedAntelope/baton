@@ -45,7 +45,7 @@ describe('full relay between two machines', () => {
 
   beforeEach(async () => {
     ({ origin, alice, bob } = await makeRelay());
-    await initCommand(alice.root, { project: 'relay-demo', handle: 'Alice Dev' });
+    await initCommand(alice.root, { project: 'relay-demo', handle: 'Alice Dev', testCmd: 'node -e "process.exit(0)"' });
     await registerBob(alice);
     await alice.git.push('origin', 'main');
     await bob.git.pull('origin', 'main');
@@ -220,5 +220,68 @@ describe('full relay between two machines', () => {
     // --force proceeds loudly
     const out = await pickupCommand(bob.root, { agent: 'generic', force: true });
     expect(out).toContain('OVERRIDDEN ERROR');
+  });
+
+  it('pickup auto-pulls latest state from origin before claiming', async () => {
+    // Alice claims and pushes state to origin
+    await claimCommand(alice.root);
+    await writeValidHandoff(alice.root, 'Alice Dev');
+    await passCommand(alice.root);
+
+    // Bob's clone is behind — no pull yet.
+    // pickup should auto-pull (syncFromOrigin) before verifying custody.
+    const out = await pickupCommand(bob.root, { agent: 'generic' });
+    expect(out).toContain('You have the baton (Bob Dev');
+    expect(out).toContain('Last pass: #1 by Alice Dev');
+
+    // Bob now holds the baton — visible from alice's clone after a pull
+    await alice.git.pull('origin', 'main');
+    const state = await readState(alice.root);
+    expect(state.holder).toBe('Bob Dev');
+  });
+
+  it('pickup warns and skips auto-pull when working tree is dirty', async () => {
+    // Alice claims and passes
+    await claimCommand(alice.root);
+    await writeValidHandoff(alice.root, 'Alice Dev');
+    await passCommand(alice.root);
+
+    // Bob pulls first so his clone is up-to-date, then creates uncommitted work
+    await bob.git.pull('origin', 'main', ['--tags']);
+    await fs.writeFile(path.join(bob.root, 'wip.txt'), 'local changes', 'utf8');
+    await fs.writeFile(path.join(bob.root, 'wip.txt'), 'local changes', 'utf8');
+    await fs.writeFile(path.join(bob.root, 'wip.txt'), 'local changes', 'utf8');
+
+    // Capture stderr to verify the warning
+    const stderrWrite = process.stderr.write.bind(process.stderr);
+    const captured: string[] = [];
+    process.stderr.write = ((chunk: string) => {
+      captured.push(chunk);
+      return true;
+    }) as typeof process.stderr.write;
+
+    try {
+      const out = await pickupCommand(bob.root, { agent: 'generic' });
+      expect(out).toContain('You have the baton (Bob Dev');
+      expect(captured.join('')).toContain('skipping auto-pull');
+    } finally {
+      process.stderr.write = stderrWrite;
+    }
+
+    // Uncommitted file must survive
+    expect(await fs.readFile(path.join(bob.root, 'wip.txt'), 'utf8')).toBe('local changes');
+  });
+
+  it('--no-pull skips the auto-pull entirely', async () => {
+    // Alice claims and passes
+    await claimCommand(alice.root);
+    await writeValidHandoff(alice.root, 'Alice Dev');
+    await passCommand(alice.root);
+
+    // Bob pulls first so his clone is up-to-date, then tests --no-pull.
+    await bob.git.pull('origin', 'main', ['--tags']);
+    await expect(pickupCommand(bob.root, { agent: 'generic', noPull: true })).resolves.toContain(
+      'You have the baton (Bob Dev',
+    );
   });
 });

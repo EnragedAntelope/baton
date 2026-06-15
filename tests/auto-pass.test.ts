@@ -3,11 +3,12 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { claimCommand } from '../src/commands/claim.js';
 import { initCommand } from '../src/commands/init.js';
-import { passCommand } from '../src/commands/pass.js';
 import {
   buildAgentCommand,
   detectAgentSession,
-} from '../src/core/agent-invoke.js';
+  } from '../src/core/agent-invoke.js';
+import { passCommand } from '../src/commands/pass.js';
+import { BatonError } from '../src/core/files.js';
 import { makeRepo, rmrf, TempRepo } from './helpers.js';
 
 const noSession = () => null;
@@ -17,7 +18,7 @@ describe('baton pass --auto (headless agent fill)', () => {
 
   beforeEach(async () => {
     repo = await makeRepo('auto');
-    await initCommand(repo.root, { project: 'auto-demo', agent: 'claude-code' });
+    await initCommand(repo.root, { project: 'auto-demo', agent: 'claude-code', testCmd: 'node -e "process.exit(0)"' });
     await claimCommand(repo.root);
   });
 
@@ -97,6 +98,38 @@ describe('baton pass --auto (headless agent fill)', () => {
         { detectSession: () => 'claude-code' },
       ),
     ).rejects.toThrow(/inside of a claude-code session/);
+  });
+
+  it('surfaces timeout from agent invocation', async () => {
+    await expect(
+      passCommand(
+        repo.root,
+        { auto: true, autoTimeout: 5 },
+        {
+          detectSession: noSession,
+          invoke: async () => {
+            // Simulate the real invokeAgent timing out
+            throw new BatonError('Agent invocation timed out after 5 seconds');
+          },
+        },
+      ),
+    ).rejects.toThrow(/timed out after 5 seconds/);
+  });
+
+  it('rejects when agent returns invalid output', async () => {
+    await expect(
+      passCommand(
+        repo.root,
+        { auto: true },
+        {
+          detectSession: noSession,
+          invoke: async () => {
+            // Simulate invokeAgent detecting non-text/garbage output
+            return { ok: false, detail: 'Agent returned invalid output (non-text or binary garbage)' };
+          },
+        },
+      ),
+    ).rejects.toThrow(/invalid output/);
   });
 });
 

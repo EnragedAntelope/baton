@@ -113,3 +113,61 @@ const ADAPTERS: Record<AgentName, Adapter> = {
 export function getAdapter(name: AgentName): Adapter {
   return ADAPTERS[name];
 }
+
+import { execSync } from 'node:child_process';
+import { BatonError } from '../core/files.js';
+
+/** Detect the agent type from config files and PATH. */
+export async function detectAgent(root: string): Promise<AgentName | null> {
+  const detected: { name: AgentName; mtime: number }[] = [];
+
+  // 1. Check for agent config files
+  const configFiles: { name: AgentName; file: string }[] = [
+    { name: 'claude-code', file: 'CLAUDE.md' },
+    { name: 'opencode', file: 'AGENTS.md' },
+    { name: 'codex', file: 'AGENTS.md' },
+  ];
+
+  for (const { name, file } of configFiles) {
+    const filePath = path.join(root, file);
+    try {
+      const stat = await fs.stat(filePath);
+      detected.push({ name, mtime: stat.mtimeMs });
+    } catch {
+      // file doesn't exist
+    }
+  }
+
+  // 2. Check for agent CLI in PATH
+  const cliCommands: { name: AgentName; command: string }[] = [
+    { name: 'claude-code', command: 'claude' },
+    { name: 'opencode', command: 'opencode' },
+    { name: 'codex', command: 'codex' },
+  ];
+
+  for (const { name, command } of cliCommands) {
+    try {
+      execSync(`where ${command}`, { stdio: 'ignore' });
+      // Only add if not already detected from config file
+      if (!detected.some((d) => d.name === name)) {
+        detected.push({ name, mtime: 0 });
+      }
+    } catch {
+      // command not found
+    }
+  }
+
+  // 3. If exactly one agent detected, return it
+  if (detected.length === 1) {
+    return detected[0]!.name;
+  }
+
+  // 4. If multiple detected, prefer newest mtime on config files
+  if (detected.length > 1) {
+    detected.sort((a, b) => b.mtime - a.mtime);
+    return detected[0]!.name;
+  }
+
+  // 5. If none detected, return null
+  return null;
+}

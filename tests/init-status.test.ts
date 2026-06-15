@@ -48,7 +48,7 @@ describe('baton init', () => {
 
   it('refuses to re-init', async () => {
     repo = await makeRepo('reinit');
-    await initCommand(repo.root, {});
+    await initCommand(repo.root, { testCmd: 'node -e "process.exit(0)"' });
     await expect(initCommand(repo.root, {})).rejects.toThrow(/already exists/);
   });
 
@@ -63,7 +63,7 @@ describe('baton init', () => {
 
   it('the installed pre-commit hook blocks a staged secret in .baton/', async () => {
     repo = await makeRepo('hook');
-    await initCommand(repo.root, {});
+    await initCommand(repo.root, { testCmd: 'node -e "process.exit(0)"' });
     const secretFile = path.join(repo.root, '.baton', 'HANDOFF.md');
     await fs.writeFile(
       secretFile,
@@ -88,7 +88,7 @@ describe('baton status & task', () => {
 
   it('shows holder, branch, and task summary', async () => {
     repo = await makeRepo('status');
-    await initCommand(repo.root, { project: 'demo' });
+    await initCommand(repo.root, { project: 'demo', testCmd: 'node -e "process.exit(0)"' });
     await taskAddCommand(repo.root, 'Build auth', []);
     await taskAddCommand(repo.root, 'Rate limiting', ['task-1']);
     await taskSetCommand(repo.root, 'task-1', 'in-progress');
