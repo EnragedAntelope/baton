@@ -1,4 +1,5 @@
 import { promises as fs } from 'node:fs';
+import readline from 'node:readline';
 import {
   batonPaths,
   BatonError,
@@ -22,6 +23,10 @@ export interface UndoOptions {
   mode: UndoMode;
 }
 
+/** Test seam: inject a mock readline for interactive prompts. */
+export interface UndoDeps {
+  promptReadline?: readline.Interface;
+}
 function formatSnapshotList(timestamps: string[]): string {
   return timestamps
     .map((ts, i) => {
@@ -42,6 +47,7 @@ function formatSnapshotList(timestamps: string[]): string {
 export async function undoCommand(
   cwd: string,
   opts: UndoOptions,
+  deps: UndoDeps = {},
 ): Promise<string> {
   const ctx = await loadContext(cwd);
   const paths = batonPaths(ctx.root);
@@ -76,7 +82,7 @@ export async function undoCommand(
           return true;
         },
       },
-    ]);
+    ], deps.promptReadline);
 
     if (choice === 'q') {
       return 'Undo cancelled.';
@@ -104,7 +110,7 @@ const restored = snapshots[idx];
   }
 
   // --claim and --pass modes require confirmation
-  const confirmed = await confirmPrompt('This will release the baton. Continue?');
+  const confirmed = await confirmPrompt('This will release the baton. Continue?', false, deps.promptReadline);
   if (!confirmed) {
     return 'Undo cancelled.';
   }
@@ -118,11 +124,10 @@ const restored = snapshots[idx];
     }
   }
 
-  // Save current state as a snapshot before restoring (preserve the undo point)
+  // Save current state as a snapshot first (preserve the undo point),
+  // then restore the PREVIOUS snapshot — not the one just saved.
   await saveSnapshot(ctx.root);
-
-  // Restore the latest snapshot (pre-claim or pre-pass state)
-  await restoreSnapshot(ctx.root);
+  await restoreSnapshot(ctx.root, snapshots[snapshots.length - 1]!);
 
   await commitPaths(ctx.git, `baton: undo --${opts.mode} by ${ctx.handle}`, [
     '.baton/state.json',
