@@ -131,6 +131,76 @@ describe('baton pass --auto (headless agent fill)', () => {
       ),
     ).rejects.toThrow(/invalid output/);
   });
+
+  it('completes the pass with a gemini invoker producing a complete handoff', async () => {
+    const prompts: string[] = [];
+    const out = await passCommand(
+      repo.root,
+      { auto: true, agent: 'gemini' },
+      {
+        detectSession: noSession,
+        invoke: async (cmd, prompt) => {
+          prompts.push(prompt);
+          expect(cmd.command).toBe('gemini');
+          expect(cmd.args).toEqual(['-p']);
+          const handoffPath = path.join(repo.root, '.baton', 'HANDOFF.md');
+          const template = await fs.readFile(handoffPath, 'utf8');
+          const filled = template
+            .replaceAll('_(fill me in)_', 'Filled by gemini headless agent.')
+            .replace(/- Tests: _\(fill me in\)_/, '- Tests: 42 passing');
+          await fs.writeFile(handoffPath, filled, 'utf8');
+          return { ok: true, detail: 'done' };
+        },
+      },
+    );
+    expect(out).toContain('pass #1');
+    expect(out).toContain('filled headlessly by gemini');
+    expect(prompts[0]).toContain('NEVER write a secret value');
+    expect(prompts[0]).toContain('ONLY files inside .baton/');
+    const handoffContent = await fs.readFile(
+      path.join(repo.root, '.baton', 'HANDOFF.md'),
+      'utf8',
+    );
+    for (const section of [
+      'Where things stand',
+      'Done this session',
+      'In progress / next up',
+      'Blockers & landmines',
+      'Branch & build state',
+    ]) {
+      expect(handoffContent).toContain(`## ${section}`);
+    }
+    expect(handoffContent).not.toContain('_(fill me in)_');
+  });
+
+  it('fails clearly when the agent returns empty output', async () => {
+    await expect(
+      passCommand(
+        repo.root,
+        { auto: true },
+        {
+          detectSession: noSession,
+          invoke: async () => ({ ok: false, detail: 'Agent returned empty output' }),
+        },
+      ),
+    ).rejects.toThrow(/agent invocation failed[\s\S]*empty output/);
+  });
+
+  it('surfaces stderr when the agent exits non-zero', async () => {
+    await expect(
+      passCommand(
+        repo.root,
+        { auto: true, agent: 'gemini' },
+        {
+          detectSession: noSession,
+          invoke: async () => ({
+            ok: false,
+            detail: '"gemini" exited with 1\nError: GEMINI_API_KEY not set',
+          }),
+        },
+      ),
+    ).rejects.toThrow(/agent invocation failed[\s\S]*GEMINI_API_KEY not set/);
+  });
 });
 
 describe('agent command mapping', () => {
