@@ -92,6 +92,7 @@ baton pass
 | `decisions.md` | Append-only log of decisions ("chose SQLite because…") |
 | `state.json` | Who holds the baton, pass count, policies |
 | `sessions/` | Archived handoffs from previous sessions |
+| `sessions/.trash/` | Compacted archives awaiting `baton compact --prune` |
 | `hooks/` | The committed secret-scan pre-commit hook |
 
 ## Commands
@@ -109,6 +110,7 @@ baton pass
 | `baton log` | The pass history (chain of custody) |
 | `baton task list/add/set` | Manage the task ledger by hand |
 | `baton scan` | Scan `.baton/` for secrets on demand |
+| `baton compact [--keep N] [--dry-run] [--prune]` | Squash old session archives into a rollup summary (keeps 10 most recent by default) |
 
 ## Working with agents
 
@@ -119,11 +121,13 @@ pass` then validates the result; incomplete or secret-bearing handoffs are
 rejected, so a lazy summary can't slip through.
 
 On pickup, the adapter for your agent injects a pointer block into its native
-context file (`CLAUDE.md` for Claude Code, `AGENTS.md` for OpenCode/Codex) so
-every future session in that clone starts baton-aware.
+context file (`CLAUDE.md` for Claude Code, `AGENTS.md` for OpenCode/Codex, or
+a Gemini-compatible equivalent) so every future session starts baton-aware.
+
+Supported agents today: **Claude Code**, **OpenCode**, **Codex**, **Gemini**, plus a **generic** copy-paste adapter. More welcome.
 
 Not in an agent session? `baton pass --auto` invokes your agent CLI headlessly
-(`claude -p`, `opencode run`, `codex exec`) to fill the handoff template from the
+(`claude -p`, `opencode run`, `codex exec`, `gemini -p`) to fill the handoff template from the
 repo's recent history, then continues the pass. It refuses to run from *inside*
 an agent session — the agent that did the work writes a better handoff than a
 cold one — and falls back to the manual template if the CLI isn't available.
@@ -162,7 +166,11 @@ laptop burns everyone's access. Baton exists so the relay works *without* it.
   the loser gets a clear "held by alice" message within seconds. Fine for
   2–6 person relays; an atomic claim server (+ Discord notifications + web
   dashboard) is the planned v2.
-- Adapters today: Claude Code, OpenCode, Codex, generic. More welcome.
+- Adapters today: Claude Code, OpenCode, Codex, Gemini (Antigravity CLI), generic. More welcome.
+
+> **Note:** Gemini CLI (`@google/gemini-cli`) was rebranded to **Antigravity CLI**
+> in June 2026. The CLI binary name is `antigravity` (gemini-cli package v1.0.2+).
+> Baton supports both `gemini` and `antigravity` binary names.
 
 ## Development
 

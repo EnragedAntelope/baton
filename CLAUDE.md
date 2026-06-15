@@ -32,7 +32,7 @@ src/security/         scan-rules.ts (serializable gitleaks-style rules),
                       secrets-scan.ts, hook.ts (generates the standalone
                       pre-commit script committed into .baton/hooks/),
                       verify.ts (custody chain checks)
-src/adapters/         claude-code / opencode / codex / generic
+src/adapters/         claude-code / opencode / codex / gemini / generic
 src/commands/         one file per CLI command; context.ts loads+validates all
 src/index.ts          commander wiring; BatonError → friendly stderr + exit 1
 skills/baton-pass/    SKILL.md — how agents distill a session into a handoff
@@ -102,14 +102,18 @@ commit. Keep it that way.
    session (env detection); always degrades to the manual template flow.
    Caveat: a headless agent reconstructs the session cold from git history,
    so in-session distillation (the skill) remains the recommended path.
+10. ✅ `baton doctor` (10 health checks: Node.js, git, state, agents).
+11. ✅ `baton compact` (keep-last + rollup to trash).
+12. ✅ Gemini adapter (types + adapter + invoker).
+13. ✅ npm publish readiness (package published as `baton-relay`).
 
 ### Remaining
 
-- **Phase 2:** coordination server — atomic claim API (Postgres/Redis lock),
-  GitHub OAuth, queue + Discord webhook notifications, read-only dashboard.
-- **Phase 3:** allowance-aware checkpoint nudges, Gemini adapter,
-  `baton doctor`, `baton compact` (squash session archives).
-- Publish to npm (`baton-relay`); enable branch protection on the GitHub repo.
+- **Phase 2 (potential future enhancement):** coordination server — atomic
+  claim API (Postgres/Redis lock), GitHub OAuth, queue + Discord webhook
+  notifications, read-only dashboard. No active plan.
+- Allowance-aware checkpoint nudges.
+- `baton compact` advanced (squash beyond keep-last).
 - Real-world validation of `--auto` against real agent CLI versions (unit
   tests use an injected invoker; the spawn path is exercised only manually).
 - Real-world dogfood: relay this repo's own development via Baton.

@@ -192,25 +192,40 @@ Override a stale lock (holder unreachable past `staleLockHours`). Logged loudly 
 
 ---
 
-## 7. Implementation Order
+#### Phase 1 — MVP (git-only) — ✅ COMPLETE (all 9 items)
 
-**Phase 1 — MVP (git-only)** — ✅ complete, see CLAUDE.md for status detail
-1. `types.ts` schemas + fixtures (acceptance: zod round-trips all three JSON files)
-2. `init`, `status` (acceptance: scaffold + hook install verified on Windows/WSL2, macOS, Linux)
-3. `claim`/`pass`/`pickup` with generic adapter (acceptance: full relay between two machines, race test for claim)
-4. Secret scan + policy gates (acceptance: planted fake AWS key in HANDOFF.md blocks the pass)
-5. baton-pass skill for Claude Code + OpenCode adapter (acceptance: agent-generated handoff passes schema validation; pickup bootstrap produces a correct "continue task-N" first response)
-6. `steal`, `log`, signed-tag verify
+1. ✅ `types.ts` schemas + fixtures (zod round-trips all three JSON files)
+2. ✅ `init`, `status` (scaffold + hook install verified on Windows/WSL2, macOS, Linux)
+3. ✅ `claim`/`pass`/`pickup` with generic adapter (full relay between two machines, race test)
+4. ✅ Secret scan + policy gates (planted fake AWS key blocks the pass)
+5. ✅ baton-pass skill for Claude Code + OpenCode/Codex adapters (agent-generated handoff passes validation; pickup bootstrap correct)
+6. ✅ `steal`, `log`, signed-tag verify on pickup
+7. ✅ CI: GitHub Actions matrix (ubuntu/windows/macos × Node 20/22)
+8. ✅ `task list/add/set`, `scan` commands
+9. ✅ `baton pass --auto` spike: headless agent CLI invocation (`claude -p`, `opencode run`, `codex exec`); refuses inside agent session; degrades to manual template
 
-**Phase 2 — Coordination server (optional)**
-7. Claim API with atomic lock (Postgres row lock or Redis), GitHub OAuth
-8. Queue + notifications (Discord webhook first — that's where these groups live; email second)
-9. Read-only web dashboard: who holds it, task burn-down, pass history
+**Phase 1 last updated:** 2026-06-15 — All acceptance criteria met.
 
-**Phase 3 — Quality of life**
-10. Allowance-aware nudges ("you've been holding 4h — consider a checkpoint pass")
-11. Codex/Gemini adapters; `baton doctor` (env/agent detection)
+#### Phase 2 — Coordination server — ⏸ DEFERRED
 
+DEFERRED — potential future enhancement, not actively planned.
+
+7. ⏸ Claim API with atomic lock (Postgres row lock or Redis), GitHub OAuth
+8. ⏸ Queue + notifications (Discord webhook first, email second)
+9. ⏸ Read-only web dashboard: who holds it, task burn-down, pass history
+
+#### Phase 3 — Quality of life — partially implemented
+
+10. ✅ `baton doctor` (env/agent detection, `.baton/` health check)
+11. ✅ `baton compact --keep N` (session archive squashing, keep-most-recent)
+12. ✅ Gemini adapter (Antigravity CLI — `@google/gemini-cli` rebranded June 2026)
+13. ⏸ Allowance-aware nudges ("you've been holding 4h — consider a checkpoint pass") — DEFERRED
+14. ⏸ `baton compact` advanced (full squash/rollup) — DEFERRED (keep-last is implemented)
+
+#### npm publish — READY
+
+Verification complete (`npm test`, `npm run typecheck`, `npm run build` all pass).
+Not yet published — awaiting manual `npm publish` with the `baton-relay` package name.
 ---
 
 ## 8. Risks & Mitigations
