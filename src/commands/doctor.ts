@@ -1,10 +1,8 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
-import { z } from 'zod';
 import { detectAgent } from '../adapters/index.js';
 import { batonPaths, BatonError, readState, readTasks, readConfig } from '../core/files.js';
 import { findRepoRoot, getGit, getIdentity, hasOrigin } from '../core/repo.js';
-import { StateSchema, ConfigSchema, TasksFileSchema } from '../types.js';
 
 export interface CheckResult {
   name: string;

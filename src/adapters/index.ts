@@ -115,7 +115,6 @@ export function getAdapter(name: AgentName): Adapter {
 }
 
 import { execSync } from 'node:child_process';
-import { BatonError } from '../core/files.js';
 
 /** Detect the agent type from config files and PATH. */
 export async function detectAgent(root: string): Promise<AgentName | null> {

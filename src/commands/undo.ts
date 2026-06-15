@@ -91,8 +91,8 @@ export async function undoCommand(
     if (idx < 0 || idx >= snapshots.length || !snapshots[idx]) {
       return 'Invalid selection.';
     }
-await restoreSnapshot(ctx.root, snapshots[idx]);
-const restored = snapshots[idx];
+    await restoreSnapshot(ctx.root, snapshots[idx]);
+    const restored = snapshots[idx];
     const d = new Date(
       Number(restored.slice(0, 4)),
       Number(restored.slice(4, 6)) - 1,

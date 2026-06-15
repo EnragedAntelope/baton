@@ -14,8 +14,8 @@ import {
 } from '../core/repo.js';
 import { openTasks } from '../core/tasks.js';
 import { verifyLastPass } from '../security/verify.js';
-import { getAdapter } from '../adapters/index.js';
-import { AgentNameSchema } from '../types.js';
+import { getAdapter, detectAgent } from '../adapters/index.js';
+import { AgentName, AgentNameSchema } from '../types.js';
 import { loadContext } from './context.js';
 import { describeHolder } from '../core/lock.js';
 
@@ -65,11 +65,19 @@ export async function pickupCommand(
     }
   }
   const ctx = await loadContext(cwd);
-  const agentName = AgentNameSchema.parse(
-    opts.agent ??
-      ctx.config.participants.find((p) => p.handle === ctx.handle)?.agent ??
-      ctx.config.defaultAgent,
-  );
+  let agentName: AgentName;
+  if (opts.agent) {
+    agentName = AgentNameSchema.parse(opts.agent);
+  } else {
+    const detected = await detectAgent(ctx.root);
+    if (detected) {
+      agentName = detected;
+    } else {
+      throw new BatonError(
+        'No agent detected and --agent not specified. Use --agent to choose: claude-code, opencode, codex, or generic.',
+      );
+    }
+  }
 
   // Verify the custody chain before trusting the handoff.
   const verification = await verifyLastPass(ctx.git, ctx.state, ctx.config);

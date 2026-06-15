@@ -78,6 +78,10 @@ program
     'timeout for --auto agent invocation (default 60)',
     '60',
   )
+  .option(
+    '--interactive',
+    'prompt for each handoff section with smart defaults',
+  )
   .action((opts) =>
     run(() =>
       passCommand(process.cwd(), {
@@ -85,6 +89,7 @@ program
         skipTests: opts.skipTests,
         auto: opts.auto,
         autoTimeout: Number(opts.autoTimeout),
+        interactive: opts.interactive,
       }),
     ),
   );
