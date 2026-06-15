@@ -56,20 +56,21 @@ export function buildFirstPrompt(ctx: BootstrapContext): string {
 
 /** Idempotently append the baton pointer block to a context file. */
 export async function ensurePointer(
-  root: string,
-  fileName: string,
+root: string,
+fileName: string,
 ): Promise<{ changed: boolean }> {
-  const filePath = path.join(root, fileName);
-  let content = '';
-  try {
-    content = await fs.readFile(filePath, 'utf8');
-  } catch {
-    // file doesn't exist yet
-  }
-  if (content.includes(POINTER_BEGIN)) return { changed: false };
+const filePath = path.join(root, fileName);
+let content = '';
+try {
+content = await fs.readFile(filePath, 'utf8');
+} catch {
+// file doesn't exist yet
+}
+if (content.includes(POINTER_BEGIN)) return { changed: false };
   const sep = content.length > 0 && !content.endsWith('\n\n') ? '\n' : '';
-  await fs.writeFile(filePath, content + sep + pointerBlock(), 'utf8');
-  return { changed: true };
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+await fs.writeFile(filePath, content + sep + pointerBlock(), 'utf8');
+return { changed: true };
 }
 
 function fileAdapter(name: AgentName, fileName: string): Adapter {
