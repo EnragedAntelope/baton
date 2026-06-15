@@ -12,6 +12,7 @@ import { stealCommand } from './commands/steal.js';
 import { logCommand } from './commands/log.js';
 import { doctorCommand } from './commands/doctor.js';
 import { undoCommand, UndoMode } from './commands/undo.js';
+import { compactCommand } from './commands/compact.js';
 import { taskAddCommand, taskListCommand, taskSetCommand } from './commands/task.js';
 
 const program = new Command();
@@ -141,6 +142,22 @@ program
   .description('Scan .baton/ files for secrets (used by the pre-commit hook)')
   .option('--staged', 'scan staged changes instead of the working tree')
   .action((opts) => run(() => scanCommand(process.cwd(), opts)));
+
+program
+  .command('compact')
+  .description('Squash old session archives into a rollup summary')
+  .option('--keep <n>', 'number of most recent archives to keep', '10')
+  .option('--dry-run', 'show what would happen without making changes')
+  .option('--prune', 'permanently delete trashed archives')
+  .action((opts) =>
+    run(() =>
+      compactCommand(process.cwd(), {
+        keep: Number(opts.keep),
+        dryRun: !!opts.dryRun,
+        prune: !!opts.prune,
+      }),
+    ),
+  );
 
 const task = program
   .command('task')

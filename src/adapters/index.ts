@@ -107,6 +107,10 @@ const ADAPTERS: Record<AgentName, Adapter> = {
   'claude-code': fileAdapter('claude-code', 'CLAUDE.md'),
   opencode: fileAdapter('opencode', 'AGENTS.md'),
   codex: fileAdapter('codex', 'AGENTS.md'),
+  // antigravity is the Gemini CLI rebrand (rebranded 2026); it reads the same
+  // .gemini/context.md file, so it shares the gemini adapter's target.
+  gemini: fileAdapter('gemini', '.gemini/context.md'),
+  antigravity: fileAdapter('antigravity', '.gemini/context.md'),
   generic: genericAdapter,
 };
 
@@ -125,6 +129,7 @@ export async function detectAgent(root: string): Promise<AgentName | null> {
     { name: 'claude-code', file: 'CLAUDE.md' },
     { name: 'opencode', file: 'AGENTS.md' },
     { name: 'codex', file: 'AGENTS.md' },
+    { name: 'gemini', file: '.gemini/context.md' },
   ];
 
   for (const { name, file } of configFiles) {
@@ -142,6 +147,8 @@ export async function detectAgent(root: string): Promise<AgentName | null> {
     { name: 'claude-code', command: 'claude' },
     { name: 'opencode', command: 'opencode' },
     { name: 'codex', command: 'codex' },
+    { name: 'gemini', command: 'gemini' },
+    { name: 'antigravity', command: 'antigravity' },
   ];
 
   for (const { name, command } of cliCommands) {

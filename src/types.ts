@@ -114,10 +114,12 @@ export function defaultTasksFile(): TasksFile {
 // ---------------------------------------------------------------------------
 
 export const AgentNameSchema = z.enum([
-  'claude-code',
-  'opencode',
+'claude-code',
+'opencode',
   'codex',
-  'generic',
+  'gemini',
+  'antigravity',
+'generic',
 ]);
 
 export const ParticipantSchema = z

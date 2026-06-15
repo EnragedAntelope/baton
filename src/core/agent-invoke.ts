@@ -27,6 +27,12 @@ export function buildAgentCommand(agent: AgentName): AgentCommand | null {
     case 'codex':
       // "-" = read prompt from stdin; workspace-write so it can edit .baton/.
       return { command: 'codex', args: ['exec', '--sandbox', 'workspace-write', '-'] };
+    case 'gemini':
+      // gemini -p reads the prompt from stdin.
+      return { command: 'gemini', args: ['-p'] };
+    case 'antigravity':
+      // antigravity is the rebrand of gemini-cli; same -p stdin semantics.
+      return { command: 'antigravity', args: ['-p'] };
     case 'generic':
       return null;
   }
@@ -41,6 +47,7 @@ export function detectAgentSession(env: NodeJS.ProcessEnv = process.env): string
   if (env.CLAUDECODE || env.CLAUDE_CODE_ENTRYPOINT) return 'claude-code';
   if (env.OPENCODE || env.OPENCODE_SERVER) return 'opencode';
   if (env.CODEX_SANDBOX || env.CODEX_HOME) return 'codex';
+  if (env.GEMINI_CLI_SESSION) return 'gemini';
   return null;
 }
 
