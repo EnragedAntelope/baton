@@ -16,7 +16,7 @@
     "node": ">=20"
   },
   "bin": {
-    "baton": "./dist/index.js"
+    "baton": "dist/index.js"
   },
   "files": [
     "dist",

@@ -14,7 +14,9 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "declaration": true,
-    "sourceMap": true
+    "declaration": true,
+    "sourceMap": true,
+    "newLine": "LF"
   },
   "include": ["src"],
   "exclude": ["node_modules", "dist", "tests"]
