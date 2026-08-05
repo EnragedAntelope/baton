@@ -16,7 +16,7 @@ Baton (`baton-relay` on npm) is a CLI for relaying one AI-assisted coding projec
 | `src/types.ts` | Zod schemas (state/tasks/config) — strict, versioned |
 | `src/core/` | files.ts (validated IO), repo.ts (git), lock.ts (pure claim/release), handoff.ts, tasks.ts |
 | `src/security/` | scan-rules.ts, secrets-scan.ts, hook.ts (pre-commit generator), verify.ts (custody chain) |
-| `src/adapters/` | claude-code / opencode / codex / gemini / generic |
+| `src/adapters/` | claude-code / opencode / codex / gemini / antigravity / generic |
 | `src/commands/` | One file per CLI command; context.ts loads+validates all |
 | `src/index.ts` | Commander wiring; BatonError → friendly stderr + exit 1 |
 | `skills/baton-pass/` | SKILL.md — how agents distill a session into a handoff |
@@ -26,7 +26,7 @@ Baton (`baton-relay` on npm) is a CLI for relaying one AI-assisted coding projec
 ## Build / test / run
 
 ```bash
-npm test            # 48 tests incl. two-machine relay, claim race, gates
+npm test            # vitest — full suite incl. two-machine relay, claim race, gates
 npm run typecheck   # tsc --noEmit
 npm run build       # tsc → dist/
 npm run dev         # tsx src/index.ts (run without build)
